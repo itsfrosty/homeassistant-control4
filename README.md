@@ -1,3 +1,8 @@
+# Deprecated
+
+This doesn't work with latest version of home assistant. Please use https://github.com/lawtancool/homeassistant-control4 which is being maintained and updated. 
+
+
 # homeassistant-control4
 
 This plugin for home assistant allows you to control your control4 devices using
