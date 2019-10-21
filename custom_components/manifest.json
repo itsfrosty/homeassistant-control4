@@ -1,0 +1,8 @@
+{
+        "domain": "control4",
+        "name": "Control4 custom component",
+        "documentation": "https://github.com/itsfrosty/homeassistant-control4",
+        "requirements": [],
+        "dependencies": [],
+        "codeowners": ["@itsfrosty"]
+}

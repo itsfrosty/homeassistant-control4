@@ -22,7 +22,7 @@ CONF_BASE_URL = 'base_url'
 CONF_PROXY_ID = 'proxy_id'
 
 DEFAULT_NAME = 'Control4 Light'
-DEFAULT_TIMEOUT = 10
+TIMEOUT = 10
 STATE_VARIABLE_ID = '1000'
 BRIGHTNESS_VARIABLE_ID = '1001'
 
@@ -30,7 +30,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_BASE_URL): cv.url,
     vol.Required(CONF_PROXY_ID): cv.positive_int,
     vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-    vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
+    vol.Optional(CONF_TIMEOUT, default=TIMEOUT): cv.positive_int,
 })
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,21 +42,17 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     name = config.get(CONF_NAME)
     base_url = config.get(CONF_BASE_URL)
     proxy_id = config.get(CONF_PROXY_ID)
-    timeout = config.get(CONF_TIMEOUT)
-
-    yield from async_add_devices(
-        [C4Light(hass, name, base_url, proxy_id, timeout)])
+    async_add_devices([C4Light(hass, name, base_url, proxy_id)])
 
 class C4Light(Light):
 
-    def __init__(self, hass, name, base_url, proxy_id, timeout):
+    def __init__(self, hass, name, base_url, proxy_id):
         self._state = None
         self._brightness = 0
         self.hass = hass
         self._name = name
         self._base_url = base_url;
         self._proxy_id = proxy_id;
-        self._timeout = timeout
 
     @property
     def name(self):
@@ -66,23 +62,21 @@ class C4Light(Light):
     def is_on(self):
         return self._state
 
-    @property
-    def brightness(self):
-        return self._brightness
+ #   @property
+ #   def brightness(self):
+ #       return self._brightness
 
-    @asyncio.coroutine
-    def async_turn_on(self, **kwargs):
+    def turn_on(self, **kwargs):
         if 'brightness' in kwargs:
-            yield from self.update_state(BRIGHTNESS_VARIABLE_ID, int(kwargs['brightness'] * 100 / 255))
             self._brightness = kwargs['brightness']
+            asyncio.run_coroutine_threadsafe(self.update_state(BRIGHTNESS_VARIABLE_ID, int(kwargs['brightness'] * 100 / 255)), self.hass.loop).result()
         else:
-            yield from self.update_state(STATE_VARIABLE_ID, 1)
             self._state = True
+            asyncio.run_coroutine_threadsafe(self.update_state(STATE_VARIABLE_ID, 1), self.hass.loop).result()
 
-    @asyncio.coroutine
-    def async_turn_off(self, **kwargs):
-        yield from self.update_state(STATE_VARIABLE_ID, 0)
+    def turn_off(self, **kwargs):
         self._state = False
+        asyncio.run_coroutine_threadsafe(self.update_state(STATE_VARIABLE_ID, 0), self.hass.loop).result()
 
     def get_url(self, url, params):
         url_parts = list(urlparse.urlparse(url))
@@ -101,10 +95,10 @@ class C4Light(Light):
             'newValue': value
         }
 
-        websession = async_get_clientsession(self.hass)
         request = None
         try:
-            with async_timeout.timeout(self._timeout, loop=self.hass.loop):
+            websession = async_get_clientsession(self.hass)
+            with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
                 request = yield from websession.get(self.get_url(self._base_url, params))
         except (asyncio.TimeoutError, aiohttp.errors.ClientError):
             _LOGGER.error("Error while turn on %s", self._base_url)
@@ -131,7 +125,7 @@ class C4Light(Light):
         request = None
 
         try:
-            with async_timeout.timeout(self._timeout, loop=self.hass.loop):
+            with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
                 request = yield from websession.get(url)
                 text = yield from request.text()
         except (asyncio.TimeoutError, aiohttp.errors.ClientError):

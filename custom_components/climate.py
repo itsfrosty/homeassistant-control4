@@ -12,41 +12,44 @@ import urllib.parse as urlparse
 from urllib.parse import urlencode
 import json
 
-from homeassistant.components.climate import (
-    STATE_HEAT, STATE_COOL, STATE_IDLE, ClimateDevice, PLATFORM_SCHEMA,
+from homeassistant.components.climate import ClimateDevice, PLATFORM_SCHEMA
+from homeassistant.components.climate.const import (
+    HVAC_MODE_OFF, HVAC_MODE_COOL, HVAC_MODE_HEAT, HVAC_MODE_AUTO,
+    CURRENT_HVAC_IDLE, CURRENT_HVAC_COOL, CURRENT_HVAC_HEAT,
     ATTR_TARGET_TEMP_HIGH, ATTR_TARGET_TEMP_LOW, ATTR_CURRENT_TEMPERATURE,
-    ATTR_OPERATION_MODE, STATE_AUTO)
-from homeassistant.const import (CONF_NAME, CONF_TIMEOUT, TEMP_FAHRENHEIT,
-        TEMP_CELSIUS, STATE_OFF, STATE_ON)
+    SUPPORT_TARGET_TEMPERATURE)
+from homeassistant.const import (CONF_NAME, CONF_TIMEOUT, TEMP_FAHRENHEIT, TEMP_CELSIUS)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.template import Template
-from homeassistant.util.async import run_callback_threadsafe
-from homeassistant.util.async import run_coroutine_threadsafe
+
+TIMEOUT = 10
+
+SUPPORT_FLAGS = (SUPPORT_TARGET_TEMPERATURE)
 
 CONF_BASE_URL = 'base_url'
 CONF_PROXY_ID = 'proxy_id'
 
-DEFAULT_NAME = 'Control4 Light'
+DEFAULT_NAME = 'Control5 Light'
 DEFAULT_TIMEOUT = 10
-STATE_VARIABLE_ID = '1104'
-OPERATION_VARIABLE_ID = '1107'
+STATE_VARIABLE_ID = '1107'
+OPERATION_VARIABLE_ID = '1104'
 CURRENT_TEMP_VARIABLE_ID = '1130'
 UNIT_VARIABLE_ID = '1100'
 TARGET_TEMP_HIGH_VARIABLE_ID = '1134'
 TARGET_TEMP_LOW_VARIABLE_ID = '1132'
 
-STATE_MAPPING = {
-    "Off": STATE_OFF,
-    "Cool": STATE_COOL,
-    "Heat": STATE_HEAT,
-    "Auto": STATE_AUTO
+OPERATION_MAPPING = {
+    "Off": HVAC_MODE_OFF,
+    "Cool": HVAC_MODE_COOL,
+    "Heat": HVAC_MODE_HEAT,
+    "Auto": HVAC_MODE_AUTO
 }
 
-OPERATION_MAPPING = {
-    "Off": STATE_IDLE,
-    "Cool": STATE_COOL,
-    "Heat": STATE_HEAT
+STATE_MAPPING = {
+    "Off": CURRENT_HVAC_IDLE,
+    "Cool": CURRENT_HVAC_COOL,
+    "Heat": CURRENT_HVAC_HEAT
 }
 
 UNIT_MAPPING = {
@@ -70,25 +73,24 @@ def async_setup_platform(hass, config, async_add_devices, discovery_info=None):
     name = config.get(CONF_NAME)
     base_url = config.get(CONF_BASE_URL)
     proxy_id = config.get(CONF_PROXY_ID)
-    timeout = config.get(CONF_TIMEOUT)
-
-    yield from async_add_devices(
-        [C4ClimateDevice(hass, name, base_url, proxy_id, timeout)])
+    async_add_devices([C4ClimateDevice(hass, name, base_url, proxy_id)])
 
 class C4ClimateDevice(ClimateDevice):
 
-    def __init__(self, hass, name, base_url, proxy_id, timeout):
-        self._state = STATE_OFF
-        self._operation = STATE_IDLE
+    def __init__(self, hass, name, base_url, proxy_id):
+        self._state = CURRENT_HVAC_IDLE
+        self._operation = HVAC_MODE_OFF
         self.hass = hass
         self._name = name
         self._base_url = base_url;
         self._proxy_id = proxy_id;
-        self._timeout = timeout
-        self._current_temp = 0
-        self._target_temp_high = 0
-        self._target_temp_low = 0
+        self._current_temp = 72
+        self._target_temp_high = 78
+        self._target_temp_low = 68
         self._unit = TEMP_FAHRENHEIT
+        self._target_temperature = 72
+        self._min_temp = 65
+        self._max_temp = 78
 
     @property
     def name(self):
@@ -99,45 +101,16 @@ class C4ClimateDevice(ClimateDevice):
         return self._unit
 
     @property
-    def precision(self):
-        return 1
+    def min_temp(self):
+        return self._min_temp
 
     @property
-    def current_temperature(self):
-        return self._current_temp
+    def max_temp(self):
+        return self._max_temp
 
     @property
-    def current_operation(self):
-        return self._operation
-
-    @property
-    def target_temperature_high(self):
-        return self._target_temp_high
-
-    @property
-    def target_temperature_low(self):
-        return self._target_temp_low
-
-    def __init__(self, hass, name, base_url, proxy_id, timeout):
-        self._state = STATE_OFF
-        self._operation = STATE_IDLE
-        self.hass = hass
-        self._name = name
-        self._base_url = base_url;
-        self._proxy_id = proxy_id;
-        self._timeout = timeout
-        self._current_temp = 0
-        self._target_temp_high = 0
-        self._target_temp_low = 0
-        self._unit = TEMP_FAHRENHEIT
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def temperature_unit(self):
-        return self._unit
+    def supported_features(self):
+        return SUPPORT_FLAGS
 
     @property
     def precision(self):
@@ -148,48 +121,7 @@ class C4ClimateDevice(ClimateDevice):
         return self._current_temp
 
     @property
-    def current_operation(self):
-        return self._operation
-
-    @property
-    def target_temperature_high(self):
-        return self._target_temp_high
-
-    @property
-    def target_temperature_low(self):
-        return self._target_temp_low
-
-    def __init__(self, hass, name, base_url, proxy_id, timeout):
-        self._state = STATE_OFF
-        self._operation = STATE_IDLE
-        self.hass = hass
-        self._name = name
-        self._base_url = base_url;
-        self._proxy_id = proxy_id;
-        self._timeout = timeout
-        self._current_temp = 0
-        self._target_temp_high = 0
-        self._target_temp_low = 0
-        self._unit = TEMP_FAHRENHEIT
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def temperature_unit(self):
-        return self._unit
-
-    @property
-    def precision(self):
-        return 1
-
-    @property
-    def current_temperature(self):
-        return self._current_temp
-
-    @property
-    def current_operation(self):
+    def hvac_mode(self):
         """Return current operation ie. heat, cool, idle."""
         return self._operation
 
@@ -201,15 +133,18 @@ class C4ClimateDevice(ClimateDevice):
     def target_temperature_low(self):
         return self._target_temp_low
 
+    @property
+    def target_temperature(self):
+        return self._target_temperature
+
     def set_temperature(self, **kwargs):
-        if 'target_temp_high' not in kwargs or 'target_temp_low' not in kwargs:
-            return
-        if int(kwargs['target_temp_low']) != self._target_temp_low:
-            run_coroutine_threadsafe(self.update_state(TARGET_TEMP_LOW_VARIABLE_ID, int(kwargs['target_temp_low'])), self.hass.loop).result()
-            self._target_temp_low = int(kwargs['target_temp_low'])
+        self._target_temperature = int(kwargs['temperature'])
+        if self._operation == HVAC_MODE_COOL:
+            self._target_temp_high = int(kwargs['temperature'])
+            asyncio.run_coroutine_threadsafe(self.update_state(TARGET_TEMP_HIGH_VARIABLE_ID, int(kwargs['temperature'])), self.hass.loop).result()
         else:
-            run_coroutine_threadsafe(self.update_state(TARGET_TEMP_HIGH_VARIABLE_ID, int(kwargs['target_temp_high'])), self.hass.loop).result()
-            self._target_temp_high = int(kwargs['target_temp_high'])
+            self._target_temp_low = int(kwargs['temperature'])
+            asyncio.run_coroutine_threadsafe(self.update_state(TARGET_TEMP_LOW_VARIABLE_ID, int(kwargs['temperature'])), self.hass.loop).result()
 
     def get_url(self, url, params):
         url_parts = list(urlparse.urlparse(url))
@@ -228,10 +163,10 @@ class C4ClimateDevice(ClimateDevice):
             'newValue': value
         }
 
-        websession = async_get_clientsession(self.hass)
         request = None
         try:
-            with async_timeout.timeout(self._timeout, loop=self.hass.loop):
+            websession = async_get_clientsession(self.hass)
+            with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
                 request = yield from websession.get(self.get_url(self._base_url, params))
         except (asyncio.TimeoutError, aiohttp.errors.ClientError):
             _LOGGER.error("Error while turn on %s", self._base_url)
@@ -243,6 +178,42 @@ class C4ClimateDevice(ClimateDevice):
         if request.status != 200:
             _LOGGER.error("Can't turn on %s. Is resource/endpoint offline?",
                           self._base_url)
+    
+    @asyncio.coroutine
+    def async_set_hvac_mode(self, hvac_mode):
+      url_str = 'http://192.168.86.152:8080/'
+      if self._proxy_id == 36:
+        url_str = url_str + 'ThreeMode'
+      else:
+        url_str = url_str + 'TwoMode'
+
+      if hvac_mode == HVAC_MODE_HEAT:
+        self._current_operation = HVAC_MODE_HEAT
+        self._enabled = True
+        url_str = url_str + 'Heat'
+      elif hvac_mode == HVAC_MODE_COOL:
+        self._current_operation = HVAC_MODE_COOL
+        self._enabled = True
+        url_str = url_str + 'Cool'
+      elif hvac_mode == HVAC_MODE_AUTO:
+        self._current_operation = HVAC_MODE_AUTO
+        self._enabled = True
+        url_str = url_str + 'Auto'
+      elif hvac_mode == HVAC_MODE_OFF:
+        self._current_operation = HVAC_MODE_OFF
+        self._enabled = False
+        url_str = url_str + 'Off'
+
+       
+      websession = async_get_clientsession(self.hass)
+      request = None
+      with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
+        request = yield from websession.get(url_str)
+      return
+
+    @property
+    def hvac_modes(self):
+      return [HVAC_MODE_OFF, HVAC_MODE_HEAT, HVAC_MODE_COOL, HVAC_MODE_AUTO];
 
     @asyncio.coroutine
     def async_update(self):
@@ -255,12 +226,11 @@ class C4ClimateDevice(ClimateDevice):
                 TARGET_TEMP_LOW_VARIABLE_ID])
         }
         url = self.get_url(self._base_url, params)
-
         websession = async_get_clientsession(self.hass)
         request = None
 
         try:
-            with async_timeout.timeout(self._timeout, loop=self.hass.loop):
+            with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
                 request = yield from websession.get(url)
                 text = yield from request.text()
         except (asyncio.TimeoutError, aiohttp.errors.ClientError):
@@ -270,13 +240,16 @@ class C4ClimateDevice(ClimateDevice):
             if request is not None:
                 yield from request.release()
         json_text = json.loads(text)
-
         try:
-            self._state = STATE_MAPPING[json_text[STATE_VARIABLE_ID]]
+            self._state = STATE_MAPPING[json_text[STATE_VARIABLE_ID] if json_text[STATE_VARIABLE_ID] else "Off"]
             self._operation = OPERATION_MAPPING[json_text[OPERATION_VARIABLE_ID]]
             self._current_temp = int(json_text[CURRENT_TEMP_VARIABLE_ID])
             self._target_temp_high = int(json_text[TARGET_TEMP_HIGH_VARIABLE_ID])
             self._target_temp_low = int(json_text[TARGET_TEMP_LOW_VARIABLE_ID])
             self._unit = UNIT_MAPPING[json_text[UNIT_VARIABLE_ID]]
+            if self._operation == HVAC_MODE_COOL:
+                self._target_temperature = self._target_temp_high
+            else:
+                self._target_temperature = self._target_temp_low
         except ValueError:
             _LOGGER.warning('Invalid value received')
