@@ -100,7 +100,7 @@ class C4Light(Light):
             websession = async_get_clientsession(self.hass)
             with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
                 request = yield from websession.get(self.get_url(self._base_url, params))
-        except (asyncio.TimeoutError, aiohttp.errors.ClientError):
+        except (asyncio.TimeoutError, aiohttp.ClientError):
             _LOGGER.error("Error while turn on %s", self._base_url)
             return
         finally:
@@ -128,7 +128,7 @@ class C4Light(Light):
             with async_timeout.timeout(TIMEOUT, loop=self.hass.loop):
                 request = yield from websession.get(url)
                 text = yield from request.text()
-        except (asyncio.TimeoutError, aiohttp.errors.ClientError):
+        except (asyncio.TimeoutError, aiohttp.ClientError):
             _LOGGER.exception("Error while fetch data.")
             return
         finally:
